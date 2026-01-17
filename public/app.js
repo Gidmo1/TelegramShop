@@ -16,6 +16,7 @@
     overview: $('tab-overview'),
     products: $('tab-products'),
     orders: $('tab-orders'),
+    settings: $('tab-settings'), // ✅ NEW (won't break if missing)
   };
 
   // Overview / Analytics
@@ -47,6 +48,15 @@
   const refreshOrdersBtn = $('refreshOrders');
   const ordersTable = $('ordersTable');
   const ordersTbody = ordersTable ? ordersTable.querySelector('tbody') : null;
+
+  // Settings (Bank)
+  const storeCard = $('storeCard');
+  const bankForm = $('bankForm');
+  const bankName = $('bankName');
+  const accountNumber = $('accountNumber');
+  const accountName = $('accountName');
+  const bankMsg = $('bankMsg');
+  const bankClear = $('bankClear');
 
   // Token storage
   const TOKEN_KEY = 'cysb_token';
@@ -136,23 +146,97 @@
   function escapeAttr(s) { return escapeHtml(s); }
 
   // ---------- Store ----------
+  function renderStoreOverview(store) {
+    if (!storeInfo) return;
+
+    const bankOk = !!(store.bank_name && store.account_number && store.account_name);
+
+    storeInfo.innerHTML = `
+      <div><b>Name:</b> ${escapeHtml(store.name)}</div>
+      <div><b>Currency:</b> ${escapeHtml(store.currency)}</div>
+      <div><b>Channel:</b> ${
+        store.channel_username
+          ? '@' + escapeHtml(store.channel_username)
+          : (store.channel_id ? escapeHtml(store.channel_id) : '<span class="muted">Not linked</span>')
+      }</div>
+      <div><b>Delivery note:</b> ${escapeHtml(store.delivery_note || '')}</div>
+      <div><b>Bank details:</b> ${bankOk ? '✅ Set' : '<span class="muted">Not set</span>'}</div>
+    `;
+  }
+
+  function renderStoreSettingsCard(store) {
+    if (!storeCard) return;
+
+    const chan = store.channel_username
+      ? '@' + escapeHtml(store.channel_username)
+      : (store.channel_id ? escapeHtml(store.channel_id) : 'Not linked');
+
+    storeCard.innerHTML = `
+      <div class="storeRow"><b>Store</b><span>${escapeHtml(store.name)}</span></div>
+      <div class="storeRow"><b>Currency</b><span>${escapeHtml(store.currency)}</span></div>
+      <div class="storeRow"><b>Channel</b><span>${chan}</span></div>
+      <div class="storeRow"><b>Delivery</b><span>${escapeHtml(store.delivery_note || '')}</span></div>
+    `;
+  }
+
+  function populateBankForm(store) {
+    if (!bankName || !accountNumber || !accountName) return;
+    bankName.value = store.bank_name || '';
+    accountNumber.value = store.account_number || '';
+    accountName.value = store.account_name || '';
+    if (bankMsg) bankMsg.textContent = '';
+  }
+
   async function loadStore() {
     const store = (await api('/api/store')).store;
     cachedStore = store;
-
-    if (storeInfo) {
-      storeInfo.innerHTML = `
-        <div><b>Name:</b> ${escapeHtml(store.name)}</div>
-        <div><b>Currency:</b> ${escapeHtml(store.currency)}</div>
-        <div><b>Channel:</b> ${
-          store.channel_username
-            ? '@' + escapeHtml(store.channel_username)
-            : (store.channel_id ? escapeHtml(store.channel_id) : '<span class="muted">Not linked</span>')
-        }</div>
-        <div><b>Delivery note:</b> ${escapeHtml(store.delivery_note || '')}</div>
-      `;
-    }
+    renderStoreOverview(store);
+    renderStoreSettingsCard(store);
+    populateBankForm(store);
     return store;
+  }
+
+  // ---------- Settings (Bank save) ----------
+  function setBankMsg(text, ok = true) {
+    if (!bankMsg) return;
+    bankMsg.textContent = text;
+    bankMsg.style.color = ok ? 'var(--good)' : 'var(--danger)';
+  }
+
+  function validAccountNumber(s) {
+    const t = String(s || '').trim();
+    return /^[0-9]{10}$/.test(t); // Nigeria style 10 digits
+  }
+
+  async function saveBankDetails() {
+    if (!cachedStore) throw new Error('Store not loaded');
+    if (!bankName || !accountNumber || !accountName) return;
+
+    const payload = {
+      bank_name: String(bankName.value || '').trim(),
+      account_number: String(accountNumber.value || '').trim(),
+      account_name: String(accountName.value || '').trim(),
+    };
+
+    if (!payload.bank_name || !payload.account_number || !payload.account_name) {
+      setBankMsg('Please fill all bank fields.', false);
+      return;
+    }
+
+    if (!validAccountNumber(payload.account_number)) {
+      setBankMsg('Account number must be 10 digits.', false);
+      return;
+    }
+
+    setBankMsg('Saving...', true);
+
+    // Preferred endpoint (add this in worker): PUT /api/store/bank
+    // If not added yet, this will show a clear error.
+    await api('/api/store/bank', { method: 'PUT', body: payload });
+
+    // Refresh store view
+    await loadStore();
+    setBankMsg('Saved ✅ Customers will now see your bank details.', true);
   }
 
   // ---------- Products ----------
@@ -190,7 +274,7 @@
           if (act === 'toggle') {
             await toggleStock(id);
             await loadProducts();
-            await loadAnalyticsSafe(); // so KPIs update
+            await loadAnalyticsSafe();
           } else if (act === 'edit') {
             await editProduct(id);
             await loadProducts();
@@ -202,7 +286,6 @@
       });
     });
 
-    // KPI fallback update (products count)
     setKpiValue(kpiProducts, cachedProducts.length);
   }
 
@@ -253,8 +336,7 @@
   }
 
   async function addProductFromForm() {
-    if (!productForm) return;
-    if (!productFormMsg) return;
+    if (!productForm || !productFormMsg) return;
 
     productFormMsg.textContent = '';
 
@@ -276,7 +358,6 @@
     });
 
     productForm.reset();
-    // keep default in_stock as Yes
     const stockSel = productForm.querySelector('select[name="in_stock"]');
     if (stockSel) stockSel.value = '1';
 
@@ -329,7 +410,6 @@
       });
     });
 
-    // KPI fallback update (pending)
     const pendingCount = cachedOrders.filter((o) => o.status === 'pending').length;
     setKpiValue(kpiPending, pendingCount);
   }
@@ -343,7 +423,6 @@
   function setDelta(el, pct) {
     if (!el) return;
 
-    // No data
     if (pct === null || pct === undefined || !Number.isFinite(Number(pct))) {
       el.className = 'kpiDelta muted deltaFlat';
       el.innerHTML = '—';
@@ -415,15 +494,10 @@
 
     const period = periodSelect ? periodSelect.value : '30d';
 
-    // If backend endpoint doesn't exist yet, don't crash the app.
     try {
       const out = await api(`/api/analytics?period=${encodeURIComponent(period)}`);
-
-      // Expected shape (we'll implement backend next):
-      // out.analytics = { orders_total, orders_change_pct, revenue_total, revenue_change_pct, pending_total, pending_change_pct, products_total, products_change_pct, series:{labels, values} }
       const a = out.analytics || out;
 
-      // Values
       setKpiValue(kpiOrders, a.orders_total ?? cachedOrders.length);
       setDelta(kpiOrdersDelta, a.orders_change_pct);
 
@@ -437,14 +511,12 @@
       setKpiValue(kpiProducts, a.products_total ?? cachedProducts.length);
       setDelta(kpiProductsDelta, a.products_change_pct);
 
-      // Chart series
       const labels = a.series?.labels || [];
       const values = a.series?.values || [];
       if (labels.length && values.length) buildChart(labels, values);
 
       if (analyticsMsg) analyticsMsg.textContent = '';
     } catch (e) {
-      // Fallback KPIs without graph
       const pending = cachedOrders.filter((o) => o.status === 'pending').length;
 
       setKpiValue(kpiOrders, cachedOrders.length);
@@ -459,9 +531,7 @@
       setKpiValue(kpiProducts, cachedProducts.length);
       setDelta(kpiProductsDelta, null);
 
-      if (analyticsMsg) {
-        analyticsMsg.textContent = `Analytics not ready yet (${e.message}). We'll enable charts once /api/analytics is added.`;
-      }
+      if (analyticsMsg) analyticsMsg.textContent = `Analytics error: ${e.message}`;
     }
   }
 
@@ -547,6 +617,25 @@
     if (periodSelect) {
       periodSelect.addEventListener('change', () => loadAnalyticsSafe().catch(() => {}));
     }
+
+    // Settings: save bank details
+    if (bankForm) {
+      bankForm.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        saveBankDetails().catch((e) => {
+          setBankMsg(e.message || 'Failed to save bank details', false);
+        });
+      });
+    }
+
+    if (bankClear) {
+      bankClear.addEventListener('click', () => {
+        if (bankName) bankName.value = '';
+        if (accountNumber) accountNumber.value = '';
+        if (accountName) accountName.value = '';
+        if (bankMsg) bankMsg.textContent = '';
+      });
+    }
   }
 
   // ---------- Boot ----------
@@ -570,11 +659,8 @@
   }
 
   window.addEventListener('DOMContentLoaded', () => {
-    // tiny style helper for button sizing (without rewriting css)
     const style = document.createElement('style');
-    style.textContent = `
-      .smallBtn { padding: 8px 10px; font-size: 12px; border-radius: 10px; }
-    `;
+    style.textContent = `.smallBtn{padding:8px 10px;font-size:12px;border-radius:10px;}`;
     document.head.appendChild(style);
 
     wireEvents();

@@ -7,7 +7,6 @@
   --accent: #4c8bf5;
   --danger: #ff4d4d;
 
-  /* New */
   --good: #2ee59d;
   --warn: #ffb020;
   --shadow: 0 10px 30px rgba(0,0,0,0.35);
@@ -21,6 +20,8 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+
+/* ---------------- HEADER ---------------- */
 
 .top {
   display: flex;
@@ -43,6 +44,8 @@ h1 { margin: 0; font-size: 18px; }
   padding: 20px;
 }
 
+/* ---------------- CARDS ---------------- */
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -51,6 +54,16 @@ h1 { margin: 0; font-size: 18px; }
   box-shadow: var(--shadow);
 }
 
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/* ---------------- LAYOUT ---------------- */
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -58,8 +71,17 @@ h1 { margin: 0; font-size: 18px; }
   margin-bottom: 16px;
 }
 
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 @media (max-width: 900px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid,
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .muted { color: var(--muted); }
@@ -68,27 +90,38 @@ h1 { margin: 0; font-size: 18px; }
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-input, textarea, select {
+/* ---------------- INPUTS ---------------- */
+
+input,
+textarea,
+select {
   width: 100%;
   background: #0f1422;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
   color: var(--text);
+  font-size: 14px;
 }
 
-textarea { min-height: 78px; resize: vertical; }
+textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+/* ---------------- BUTTONS ---------------- */
 
 .btn {
   border: none;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   background: var(--accent);
   color: white;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .btn.secondary {
@@ -101,10 +134,13 @@ textarea { min-height: 78px; resize: vertical; }
   background: var(--danger);
 }
 
-hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 16px 0;
+/* ---------------- TABLE ---------------- */
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
 table {
@@ -126,6 +162,8 @@ tbody td {
   vertical-align: top;
 }
 
+/* ---------------- BADGES ---------------- */
+
 .badge {
   display: inline-block;
   padding: 3px 8px;
@@ -135,19 +173,8 @@ tbody td {
   color: var(--muted);
 }
 
-.flex {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-}
+/* ---------------- BRAND ---------------- */
 
-.small { font-size: 12px; }
-code { color: #c7d4ff; }
-
-/* ------------------------------
-   NEW: Brand row + logo
--------------------------------- */
 .brandRow {
   display: flex;
   align-items: center;
@@ -163,9 +190,8 @@ code { color: #c7d4ff; }
   background: #0f1422;
 }
 
-/* ------------------------------
-   NEW: Tabs
--------------------------------- */
+/* ---------------- TABS ---------------- */
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -173,24 +199,22 @@ code { color: #c7d4ff; }
   border: 1px solid var(--border);
   background: rgba(18,24,38,0.6);
   border-radius: 14px;
-  margin: 0 0 16px 0;
+  margin-bottom: 16px;
   position: sticky;
-  top: 74px; /* below header */
+  top: 74px;
   z-index: 40;
   backdrop-filter: blur(10px);
 }
 
 .tabBtn {
-  appearance: none;
-  border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   font-weight: 700;
   font-size: 13px;
-  transition: 120ms ease;
+  border: 1px solid transparent;
 }
 
 .tabBtn:hover {
@@ -199,44 +223,22 @@ code { color: #c7d4ff; }
 }
 
 .tabBtn.active {
-  background: rgba(76,139,245,0.16);
+  background: rgba(76,139,245,0.18);
   border-color: rgba(76,139,245,0.35);
   color: var(--text);
 }
 
-.tabPanel { animation: fadeIn 120ms ease; }
+.tabPanel {
+  animation: fadeIn 140ms ease;
+}
 
 @keyframes fadeIn {
-  from { opacity: 0.7; transform: translateY(2px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0.75; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 600px) {
-  .tabs { top: 88px; overflow-x: auto; }
-  .tabBtn { white-space: nowrap; }
-}
+/* ---------------- KPI ---------------- */
 
-/* ------------------------------
-   NEW: Card header + table wrap
--------------------------------- */
-.cardHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.tableWrap {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-/* ------------------------------
-   NEW: KPI cards
--------------------------------- */
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -245,7 +247,9 @@ code { color: #c7d4ff; }
 }
 
 @media (max-width: 900px) {
-  .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .kpiCard {
@@ -258,13 +262,11 @@ code { color: #c7d4ff; }
 .kpiLabel {
   font-size: 12px;
   color: var(--muted);
-  margin-bottom: 6px;
 }
 
 .kpiValue {
   font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.2px;
 }
 
 .kpiDelta {
@@ -280,8 +282,8 @@ code { color: #c7d4ff; }
 .deltaFlat { color: var(--muted); }
 
 .tri {
-  display: inline-block;
-  width: 0; height: 0;
+  width: 0;
+  height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
 }
@@ -289,12 +291,35 @@ code { color: #c7d4ff; }
 .tri.up { border-bottom: 10px solid var(--good); }
 .tri.down { border-top: 10px solid var(--danger); }
 
-/* ------------------------------
-   NEW: Chart wrap
--------------------------------- */
+/* ---------------- CHART ---------------- */
+
 .chartWrap {
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 12px;
   background: rgba(15,20,34,0.55);
+}
+
+/* ---------------- SETTINGS / BANK ---------------- */
+
+#tab-settings form {
+  display: grid;
+  gap: 12px;
+}
+
+#tab-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+#bankMsg {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+code {
+  color: #c7d4ff;
+  font-size: 12px;
 }

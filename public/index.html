@@ -48,6 +48,7 @@
         <button class="tabBtn active" data-tab="overview">Overview</button>
         <button class="tabBtn" data-tab="products">Products</button>
         <button class="tabBtn" data-tab="orders">Orders</button>
+        <button class="tabBtn" data-tab="settings">Settings</button>
       </nav>
 
       <!-- OVERVIEW TAB -->
@@ -71,7 +72,6 @@
               </div>
             </div>
 
-            <!-- KPI cards (app.js will fill these) -->
             <div id="kpis" class="kpiGrid">
               <div class="kpiCard">
                 <div class="kpiLabel">Orders</div>
@@ -98,7 +98,6 @@
               </div>
             </div>
 
-            <!-- Chart -->
             <div class="chartWrap">
               <canvas id="ordersChart" height="140"></canvas>
             </div>
@@ -193,6 +192,45 @@
               </thead>
               <tbody></tbody>
             </table>
+          </div>
+        </section>
+      </section>
+
+      <!-- SETTINGS TAB -->
+      <section id="tab-settings" class="tabPanel" hidden>
+        <section class="grid">
+          <div class="card">
+            <h2>Store info</h2>
+            <div id="storeCard" class="storeCard">Loading...</div>
+          </div>
+
+          <div class="card">
+            <h2>Bank details</h2>
+            <p class="muted">These details will be shown to customers for manual transfer.</p>
+
+            <form id="bankForm" class="form">
+              <label>
+                Bank name
+                <input id="bankName" placeholder="e.g. GTBank" required />
+              </label>
+
+              <label>
+                Account number
+                <input id="accountNumber" placeholder="10-digit account number" required />
+              </label>
+
+              <label>
+                Account name
+                <input id="accountName" placeholder="Account holder name" required />
+              </label>
+
+              <div class="row">
+                <button class="btn" type="submit">Save</button>
+                <button id="bankClear" class="btn secondary" type="button">Clear</button>
+              </div>
+
+              <div id="bankMsg" class="muted"></div>
+            </form>
           </div>
         </section>
       </section>

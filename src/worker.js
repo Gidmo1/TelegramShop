@@ -91,7 +91,7 @@ async function getState(env, userId) {
 }
 
 async function setState(env, userId, state) {
-  await env.STATE.put(`state:${userId}`, JSON.stringify(state), { expirationTtl: 600 });
+  await env.STATE.put(`state:${userId}`, JSON.stringify(state), { expirationTtl: 1800 }); // 30 mins
 }
 
 async function clearState(env, userId) {
@@ -279,6 +279,9 @@ async function handleApi(env, request) {
         delivery_note: store.delivery_note,
         channel_id: store.channel_id,
         channel_username: store.channel_username,
+        bank_name: store.bank_name || '',
+        account_number: store.account_number || '',
+        account_name: store.account_name || '',
       },
     });
   }
@@ -384,6 +387,68 @@ function orderDeepLink(env, productId) {
   return `https://t.me/${u}?start=order_${encodeURIComponent(productId)}`;
 }
 
+function moneyAmount(storeCurrency, amount) {
+  const cur = storeCurrency || '';
+  // if currency is "₦", this becomes "₦1234"
+  return `${cur}${amount}`;
+}
+
+/* -----------------------------
+   Manual transfer helpers
+------------------------------ */
+function payMenu(orderId) {
+  return kb([
+    [{ text: "I've paid ✅", callback_data: `pay:paid:${orderId}` }],
+    [{ text: "Cancel", callback_data: `pay:cancel:${orderId}` }],
+  ]);
+}
+
+function sellerPayReviewMenu(paymentId) {
+  return kb([
+    [{ text: '✅ Confirm payment', callback_data: `pay:approve:${paymentId}` }],
+    [{ text: '❌ Reject', callback_data: `pay:reject:${paymentId}` }],
+  ]);
+}
+
+async function sendPaymentInstructions(env, buyerChatId, store, product, qty, orderId) {
+  const total = asNumber(product.price) * asNumber(qty);
+  const hasBank = store.bank_name && store.account_number && store.account_name;
+
+  if (!hasBank) {
+    await tgSendMessage(
+      env,
+      buyerChatId,
+      `Order created ✅\n\n<b>${product.name}</b>\nQty: ${qty}\nTotal: <b>${escapeHtml(moneyAmount(store.currency, total))}</b>\nRef: <code>${orderId}</code>\n\n⚠️ Seller hasn’t set bank details yet. The seller will contact you for payment.`,
+      {}
+    );
+    return;
+  }
+
+  const text =
+    `Order created ✅\n\n` +
+    `<b>${product.name}</b>\n` +
+    `Qty: ${qty}\n` +
+    `Total: <b>${escapeHtml(moneyAmount(store.currency, total))}</b>\n` +
+    `Ref: <code>${orderId}</code>\n\n` +
+    `<b>Pay via bank transfer:</b>\n` +
+    `Bank: <b>${escapeHtml(store.bank_name)}</b>\n` +
+    `Account: <b>${escapeHtml(store.account_number)}</b>\n` +
+    `Name: <b>${escapeHtml(store.account_name)}</b>\n\n` +
+    `After paying, tap <b>I've paid</b> and upload your receipt/proof.`;
+
+  await tgSendMessage(env, buyerChatId, text, payMenu(orderId));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
+}
+
 async function handleTelegram(env, request) {
   const update = await request.json().catch(() => null);
   if (!update) return json({ ok: true });
@@ -395,10 +460,109 @@ async function handleTelegram(env, request) {
     const chatId = message.chat.id;
     const userId = message.from.id;
     const textMsg = (message.text || '').trim();
-    const photos = message.photo || null;
+
+    // ✅ If user is in "send payment proof" state, handle proof upload here
+    const stateEarly = await getState(env, userId);
+    if (stateEarly?.step === 'pay:proof') {
+      const orderId = stateEarly.data?.order_id;
+      if (!orderId) {
+        await clearState(env, userId);
+        await tgSendMessage(env, chatId, 'Session expired. Please order again.');
+        return json({ ok: true });
+      }
+
+      // Accept photo or document
+      const photos = message.photo || null;
+      const doc = message.document || null;
+
+      let proof_file_id = null;
+      let proof_type = null;
+
+      if (photos && photos.length) {
+        proof_file_id = photos[photos.length - 1].file_id;
+        proof_type = 'photo';
+      } else if (doc?.file_id) {
+        proof_file_id = doc.file_id;
+        proof_type = 'document';
+      }
+
+      if (!proof_file_id) {
+        await tgSendMessage(env, chatId, 'Please upload a screenshot/photo or document as proof of payment.');
+        return json({ ok: true });
+      }
+
+      // Load order + store + product
+      const order = await dbOne(env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId));
+      if (!order) {
+        await clearState(env, userId);
+        await tgSendMessage(env, chatId, 'Order not found.');
+        return json({ ok: true });
+      }
+
+      const store = await dbOne(env.DB.prepare('SELECT * FROM stores WHERE id = ?').bind(order.store_id));
+      const product = await dbOne(env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(order.product_id));
+      const amount = asNumber(product?.price) * asNumber(order.qty);
+
+      const paymentId = crypto.randomUUID();
+
+      await env.DB.prepare(`
+        INSERT INTO payments (id, order_id, store_id, buyer_id, buyer_username, amount, proof_file_id, proof_type, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'awaiting', datetime("now"))
+      `).bind(
+        paymentId,
+        orderId,
+        order.store_id,
+        String(userId),
+        String(message.from.username || ''),
+        amount,
+        proof_file_id,
+        proof_type
+      ).run();
+
+      // Update order status
+      await env.DB.prepare('UPDATE orders SET status = ? WHERE id = ? AND store_id = ?')
+        .bind('awaiting_confirmation', orderId, order.store_id).run();
+
+      await clearState(env, userId);
+
+      await tgSendMessage(
+        env,
+        chatId,
+        `Proof received ✅\nRef: <code>${orderId}</code>\n\nWaiting for seller confirmation.`,
+        {}
+      );
+
+      // Notify seller (store owner)
+      const ownerChatId = Number(store.owner_id);
+      const caption =
+        `Payment to verify ⏳\n\n` +
+        `Store: <b>${escapeHtml(store.name)}</b>\n` +
+        `Product: <b>${escapeHtml(product?.name || '')}</b>\n` +
+        `Qty: ${escapeHtml(order.qty)}\n` +
+        `Amount: <b>${escapeHtml(moneyAmount(store.currency, amount))}</b>\n` +
+        `Buyer: ${message.from.username ? '@' + escapeHtml(message.from.username) : escapeHtml(String(userId))}\n` +
+        `Order Ref: <code>${orderId}</code>`;
+
+      try {
+        if (proof_type === 'photo') {
+          await tgSendPhoto(env, ownerChatId, proof_file_id, caption, sellerPayReviewMenu(paymentId));
+        } else {
+          // Document: send as message + file_id as code (seller can still view via Telegram UI when forwarded)
+          await tgSendMessage(
+            env,
+            ownerChatId,
+            `${caption}\n\nProof (document file_id): <code>${escapeHtml(proof_file_id)}</code>\n\nOpen the buyer receipt in Telegram if visible, then confirm/reject below.`,
+            sellerPayReviewMenu(paymentId)
+          );
+        }
+      } catch {
+        // ignore
+      }
+
+      return json({ ok: true });
+    }
 
     // Handle order quantity state FIRST
-    const stateEarly = await getState(env, userId);
     if (stateEarly?.step === 'order:qty') {
       await handleTelegramOrderQty(env, message);
       return json({ ok: true });
@@ -425,7 +589,7 @@ async function handleTelegram(env, request) {
         }
 
         await setState(env, userId, { step: 'order:qty', data: { product_id: productId } });
-        await tgSendMessage(env, chatId, `Ordering: <b>${product.name}</b>\n\nQuantity? (e.g. 1)`);
+        await tgSendMessage(env, chatId, `Ordering: <b>${escapeHtml(product.name)}</b>\n\nQuantity? (e.g. 1)`);
         return json({ ok: true });
       }
 
@@ -438,185 +602,7 @@ async function handleTelegram(env, request) {
       return json({ ok: true });
     }
 
-    const state = stateEarly;
-
-    if (state?.step === 'create:name') {
-      const name = textMsg;
-      if (!name) {
-        await tgSendMessage(env, chatId, 'Send your store name (e.g. "Aisha Snacks").');
-        return json({ ok: true });
-      }
-      await setState(env, userId, { step: 'create:currency', data: { name } });
-      await tgSendMessage(env, chatId, 'Currency? (e.g. ₦, $, £)');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'create:currency') {
-      const currency = textMsg || '₦';
-      await setState(env, userId, { step: 'create:delivery', data: { ...state.data, currency } });
-      await tgSendMessage(env, chatId, 'Delivery note? (short text like: "Pickup at gate, delivery available")');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'create:delivery') {
-      const delivery_note = textMsg || '';
-      const name = state.data.name;
-      const currency = state.data.currency;
-
-      const owner_token = randomToken(24);
-      const id = crypto.randomUUID();
-
-      await env.DB.prepare(
-        'INSERT INTO stores (id, owner_id, owner_token, name, currency, delivery_note, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(id, String(userId), owner_token, name, currency, delivery_note).run();
-
-      await clearState(env, userId);
-      const link = dashboardLink(env, owner_token);
-
-      await tgSendMessage(
-        env,
-        chatId,
-        `Store created ✅\n\n<b>${name}</b>\nDashboard: ${link}\n\nNext: tap <b>Link channel</b> in the menu and add me as admin in your Telegram channel.`,
-        mainMenu()
-      );
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'link:channel') {
-      let channelRef = textMsg;
-      if (!channelRef && message.forward_from_chat) {
-        channelRef = String(message.forward_from_chat.id);
-      }
-      if (!channelRef) {
-        await tgSendMessage(env, chatId, 'Send your channel @username OR forward a message from your channel.');
-        return json({ ok: true });
-      }
-
-      const store = await ensureStoreExists(env, userId);
-      if (!store) {
-        await clearState(env, userId);
-        await tgSendMessage(env, chatId, 'You need to create a store first. Tap Create store.', mainMenu());
-        return json({ ok: true });
-      }
-
-      try {
-        const chat = await tgCall(env, 'getChat', { chat_id: channelRef });
-
-        const member = await tgCall(env, 'getChatMember', { chat_id: chat.id, user_id: userId });
-        const isOwnerOrAdmin = ['creator', 'administrator'].includes(member.status);
-        if (!isOwnerOrAdmin) {
-          await tgSendMessage(env, chatId, 'You must be an admin of that channel.');
-          return json({ ok: true });
-        }
-
-        const me = await tgCall(env, 'getMe', {});
-        const botMember = await tgCall(env, 'getChatMember', { chat_id: chat.id, user_id: me.id });
-        const botIsAdmin = ['administrator', 'creator'].includes(botMember.status);
-        if (!botIsAdmin) {
-          await tgSendMessage(env, chatId, 'Add me as <b>Admin</b> in your channel first, then try again.');
-          return json({ ok: true });
-        }
-
-        await env.DB.prepare('UPDATE stores SET channel_id = ?, channel_username = ? WHERE id = ?')
-          .bind(String(chat.id), String(chat.username || ''), store.id).run();
-
-        await clearState(env, userId);
-        await tgSendMessage(env, chatId, 'Channel linked ✅\nNow you can add products.', mainMenu());
-      } catch {
-        await tgSendMessage(env, chatId, 'Could not link channel. Make sure it’s valid and I am admin there.');
-      }
-
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'product:photo') {
-      const store = await ensureStoreExists(env, userId);
-      if (!store) {
-        await clearState(env, userId);
-        await tgSendMessage(env, chatId, 'Create a store first.', mainMenu());
-        return json({ ok: true });
-      }
-
-      if (textMsg === '/skip') {
-        await setState(env, userId, { step: 'product:name', data: { store_id: store.id, photo_file_id: null } });
-        await tgSendMessage(env, chatId, 'Product name?');
-        return json({ ok: true });
-      }
-
-      if (!photos) {
-        await tgSendMessage(env, chatId, 'Send a product photo, or type /skip');
-        return json({ ok: true });
-      }
-
-      const best = photos[photos.length - 1];
-      await setState(env, userId, { step: 'product:name', data: { store_id: store.id, photo_file_id: best.file_id } });
-      await tgSendMessage(env, chatId, 'Product name?');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'product:name') {
-      const name = textMsg;
-      if (!name) {
-        await tgSendMessage(env, chatId, 'Product name is required. Send product name.');
-        return json({ ok: true });
-      }
-      await setState(env, userId, { step: 'product:price', data: { ...state.data, name } });
-      await tgSendMessage(env, chatId, 'Price? (numbers only)');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'product:price') {
-      const price = Number(textMsg);
-      if (!Number.isFinite(price) || price < 0) {
-        await tgSendMessage(env, chatId, 'Send a valid price (e.g. 2500).');
-        return json({ ok: true });
-      }
-      await setState(env, userId, { step: 'product:desc', data: { ...state.data, price } });
-      await tgSendMessage(env, chatId, 'Short description? (or type /skip)');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'product:desc') {
-      const description = (textMsg === '/skip') ? '' : textMsg;
-      await setState(env, userId, { step: 'product:stock', data: { ...state.data, description } });
-      await tgSendMessage(env, chatId, 'In stock? Reply yes or no');
-      return json({ ok: true });
-    }
-
-    if (state?.step === 'product:stock') {
-      const in_stock = /^y(es)?$/i.test(textMsg) ? 1 : 0;
-      const { store_id, photo_file_id, name, price, description } = state.data;
-      const id = crypto.randomUUID();
-
-      await env.DB.prepare(
-        'INSERT INTO products (id, store_id, name, price, description, in_stock, photo_file_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(id, store_id, name, price, description, in_stock, photo_file_id).run();
-
-      await clearState(env, userId);
-
-      const store = await dbOne(env.DB.prepare('SELECT * FROM stores WHERE id = ?').bind(store_id));
-      if (store?.channel_id) {
-        const caption = `<b>${name}</b>\nPrice: ${store.currency}${price}\n${description ? `\n${description}` : ''}`;
-
-        // ✅ Use deep link so users can DM bot even if they never started it before
-        const deep = orderDeepLink(env, id);
-        const orderBtn = deep
-          ? kb([[{ text: 'Order', url: deep }]])
-          : kb([[{ text: 'Order', callback_data: `order:${id}` }]]);
-
-        try {
-          if (photo_file_id) {
-            await tgSendPhoto(env, store.channel_id, photo_file_id, caption, orderBtn);
-          } else {
-            await tgSendMessage(env, store.channel_id, caption, orderBtn);
-          }
-        } catch {}
-      }
-
-      await tgSendMessage(env, chatId, 'Product added ✅', mainMenu());
-      return json({ ok: true });
-    }
-
+    // Other messages ignored
     return json({ ok: true });
   }
 
@@ -627,6 +613,7 @@ async function handleTelegram(env, request) {
 
     try { await tgCall(env, 'answerCallbackQuery', { callback_query_id: cb.id }); } catch {}
 
+    // Menus
     if (data === 'menu:create') {
       await setState(env, userId, { step: 'create:name', data: {} });
       await tgSendMessage(env, chatId, 'Store name?');
@@ -665,7 +652,95 @@ async function handleTelegram(env, request) {
       return json({ ok: true });
     }
 
-    // Fallback: callback ordering (works only if user already started the bot before)
+    // Payment flow callbacks
+    const paidMatch = data.match(/^pay:paid:(.+)$/);
+    if (paidMatch) {
+      const orderId = paidMatch[1];
+
+      // Ensure order exists and belongs to this buyer
+      const order = await dbOne(env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId));
+      if (!order || String(order.buyer_id) !== String(userId)) {
+        await tgSendMessage(env, chatId, 'Order not found or not yours.');
+        return json({ ok: true });
+      }
+
+      await setState(env, userId, { step: 'pay:proof', data: { order_id: orderId } });
+      await tgSendMessage(env, chatId, 'Upload proof of payment (screenshot/photo or document).');
+      return json({ ok: true });
+    }
+
+    const cancelMatch = data.match(/^pay:cancel:(.+)$/);
+    if (cancelMatch) {
+      const orderId = cancelMatch[1];
+      await clearState(env, userId);
+      await tgSendMessage(env, chatId, `Cancelled. Ref: <code>${escapeHtml(orderId)}</code>`);
+      return json({ ok: true });
+    }
+
+    const approveMatch = data.match(/^pay:approve:(.+)$/);
+    if (approveMatch) {
+      const paymentId = approveMatch[1];
+
+      const payment = await dbOne(env.DB.prepare('SELECT * FROM payments WHERE id = ?').bind(paymentId));
+      if (!payment) {
+        await tgSendMessage(env, chatId, 'Payment not found.');
+        return json({ ok: true });
+      }
+
+      // Only store owner can approve
+      const store = await dbOne(env.DB.prepare('SELECT * FROM stores WHERE id = ?').bind(payment.store_id));
+      if (!store || String(store.owner_id) !== String(userId)) {
+        await tgSendMessage(env, chatId, 'Not allowed.');
+        return json({ ok: true });
+      }
+
+      await env.DB.prepare('UPDATE payments SET status = ? WHERE id = ?')
+        .bind('confirmed', paymentId).run();
+
+      await env.DB.prepare('UPDATE orders SET status = ? WHERE id = ? AND store_id = ?')
+        .bind('paid', payment.order_id, payment.store_id).run();
+
+      // Notify buyer
+      try {
+        await tgSendMessage(env, Number(payment.buyer_id), `Payment confirmed ✅\nOrder Ref: <code>${escapeHtml(payment.order_id)}</code>\n\nSeller will process your order now.`);
+      } catch {}
+
+      await tgSendMessage(env, chatId, `Confirmed ✅\nOrder Ref: <code>${escapeHtml(payment.order_id)}</code>`);
+      return json({ ok: true });
+    }
+
+    const rejectMatch = data.match(/^pay:reject:(.+)$/);
+    if (rejectMatch) {
+      const paymentId = rejectMatch[1];
+
+      const payment = await dbOne(env.DB.prepare('SELECT * FROM payments WHERE id = ?').bind(paymentId));
+      if (!payment) {
+        await tgSendMessage(env, chatId, 'Payment not found.');
+        return json({ ok: true });
+      }
+
+      const store = await dbOne(env.DB.prepare('SELECT * FROM stores WHERE id = ?').bind(payment.store_id));
+      if (!store || String(store.owner_id) !== String(userId)) {
+        await tgSendMessage(env, chatId, 'Not allowed.');
+        return json({ ok: true });
+      }
+
+      await env.DB.prepare('UPDATE payments SET status = ? WHERE id = ?')
+        .bind('rejected', paymentId).run();
+
+      await env.DB.prepare('UPDATE orders SET status = ? WHERE id = ? AND store_id = ?')
+        .bind('pending', payment.order_id, payment.store_id).run();
+
+      // Notify buyer to re-upload proof
+      try {
+        await tgSendMessage(env, Number(payment.buyer_id), `Payment rejected ❌\nOrder Ref: <code>${escapeHtml(payment.order_id)}</code>\n\nPlease tap the payment button again and resend proof.`);
+      } catch {}
+
+      await tgSendMessage(env, chatId, `Rejected ❌\nOrder Ref: <code>${escapeHtml(payment.order_id)}</code>`);
+      return json({ ok: true });
+    }
+
+    // Fallback: callback ordering (rare now, but kept)
     const orderMatch = data.match(/^order:(.+)$/);
     if (orderMatch) {
       const productId = orderMatch[1];
@@ -680,19 +755,7 @@ async function handleTelegram(env, request) {
       }
 
       await setState(env, userId, { step: 'order:qty', data: { product_id: productId } });
-
-      // Try DM; if user never started bot, show alert via callback
-      try {
-        await tgSendMessage(env, chatId, `Ordering: <b>${product.name}</b>\n\nQuantity? (e.g. 1)`);
-      } catch {
-        try {
-          await tgCall(env, 'answerCallbackQuery', {
-            callback_query_id: cb.id,
-            text: 'Open the bot and press Start first, then order again.',
-            show_alert: true,
-          });
-        } catch {}
-      }
+      await tgSendMessage(env, chatId, `Ordering: <b>${escapeHtml(product.name)}</b>\n\nQuantity? (e.g. 1)`);
       return json({ ok: true });
     }
 
@@ -726,24 +789,23 @@ async function handleTelegramOrderQty(env, message) {
   const store = await dbOne(env.DB.prepare('SELECT * FROM stores WHERE id = ?').bind(product.store_id));
   const orderId = crypto.randomUUID();
 
+  // Create order with buyer_id now
   await env.DB.prepare(
     'INSERT INTO orders (id, store_id, product_id, buyer_id, buyer_username, qty, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))'
-  ).bind(orderId, store.id, productId, String(userId), String(message.from.username || ''), qty, 'pending').run();
+  ).bind(orderId, store.id, productId, String(userId), String(message.from.username || ''), qty, 'pending',).run();
 
   await clearState(env, userId);
 
-  await tgSendMessage(
-    env,
-    chatId,
-    `Order placed ✅\n\n<b>${product.name}</b>\nQty: ${qty}\nRef: <code>${orderId}</code>\n\nThe seller will contact you soon.`
-  );
+  // Send payment instructions + "I've paid" button
+  await sendPaymentInstructions(env, chatId, store, product, qty, orderId);
 
+  // Notify owner of new order (still useful)
   try {
     const ownerChatId = Number(store.owner_id);
     await tgSendMessage(
       env,
       ownerChatId,
-      `New order ✅\n\n<b>${product.name}</b>\nQty: ${qty}\nBuyer: @${message.from.username || 'unknown'}\nRef: <code>${orderId}</code>`
+      `New order ✅\n\n<b>${escapeHtml(product.name)}</b>\nQty: ${qty}\nBuyer: @${escapeHtml(message.from.username || 'unknown')}\nRef: <code>${orderId}</code>\n\nWaiting for payment proof...`
     );
   } catch {}
 
