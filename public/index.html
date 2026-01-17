@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CreateYourShopBot Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>CreateYourShopBot Dashboard</h1>
+      <p class="muted" id="storeSubtitle">Use the dashboard link given by the bot (it contains your token). If you opened this page manually, paste your token below.</p>
+    </div>
+    <div class="right">
+      <button id="logoutBtn" class="btn secondary" hidden>Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="login" class="card">
+      <h2>Login</h2>
+      <p class="muted">Token is your private key. Don’t share it.</p>
+      <div class="row">
+        <input id="tokenInput" placeholder="Paste your token here" />
+        <button id="loginBtn" class="btn">Enter</button>
+      </div>
+      <p class="muted">Tip: adding product photos is easiest via the bot (Telegram stores the image and gives a reusable file_id). In the dashboard you can paste an existing <code>photo_file_id</code>.</p>
+    </section>
+
+    <section id="app" hidden>
+      <section class="grid">
+        <div class="card">
+          <h2>Store</h2>
+          <div id="storeInfo" class="muted">Loading...</div>
+        </div>
+        <div class="card">
+          <h2>Quick stats</h2>
+          <div id="stats" class="muted">Loading...</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Products</h2>
+          <button id="refreshProducts" class="btn secondary">Refresh</button>
+        </div>
+
+        <form id="productForm" class="form">
+          <div class="grid2">
+            <label>
+              Name
+              <input name="name" required />
+            </label>
+            <label>
+              Price (number)
+              <input name="price" type="number" required />
+            </label>
+          </div>
+
+          <label>
+            Description
+            <textarea name="description" rows="2"></textarea>
+          </label>
+
+          <div class="grid2">
+            <label>
+              In stock
+              <select name="in_stock">
+                <option value="1">Yes</option>
+                <option value="0">No</option>
+              </select>
+            </label>
+            <label>
+              Photo file_id (optional)
+              <input name="photo_file_id" placeholder="Paste Telegram file_id" />
+            </label>
+          </div>
+
+          <div class="row">
+            <button class="btn" type="submit">Add product</button>
+            <button id="clearForm" class="btn secondary" type="button">Clear</button>
+          </div>
+          <div id="productFormMsg" class="muted"></div>
+        </form>
+
+        <div class="tableWrap">
+          <table id="productsTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Photo</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Orders</h2>
+          <button id="refreshOrders" class="btn secondary">Refresh</button>
+        </div>
+        <div class="tableWrap">
+          <table id="ordersTable">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Product</th>
+                <th>Buyer</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

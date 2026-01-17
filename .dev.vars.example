@@ -1,0 +1,4 @@
+# For local dev (wrangler dev)
+TELEGRAM_BOT_TOKEN=PASTE_YOUR_BOTFATHER_TOKEN
+APP_BASE_URL=http://127.0.0.1:8787
+SUPPORT_USERNAME=@YourSupportUsername
