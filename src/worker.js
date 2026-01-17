@@ -595,7 +595,8 @@ async function handleTelegram(env, request) {
 
   if (cb) {
     const userId = cb.from.id;
-    const chatId = cb.message?.chat?.id || cb.from.id;
+// Always DM the user (channels can't accept replies)
+    const chatId = cb.from.id;
     const data = cb.data || '';
 
     try { await tgCall(env, 'answerCallbackQuery', { callback_query_id: cb.id }); } catch {}
