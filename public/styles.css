@@ -1,163 +1,216 @@
 :root {
-  --bg: #0f1115;
-  --card: #151922;
-  --card-2: #1b2030;
-  --text: #eaeaf0;
-  --muted: #9aa0b3;
-  --primary: #5b8cff;
-  --danger: #ff5b5b;
-  --success: #2fd27a;
-  --border: #262b3a;
-  --shadow: 0 10px 30px rgba(0,0,0,.35);
-  --radius: 14px;
+  --bg: #0b0e14;
+  --card: #121826;
+  --panel: #0f1422;
+  --border: #1f2a40;
+  --text: #e6e9ef;
+  --muted: #9aa4b2;
+
+  --accent: #4c8bf5;
+  --good: #2ee59d;
+  --bad: #ff5c5c;
+  --warn: #ffb020;
+
+  --shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Helvetica, Arial, sans-serif;
-}
-
-a {
-  color: var(--primary);
-  text-decoration: none;
-}
-
-h1, h2, h3 {
-  margin: 0;
-  font-weight: 600;
-}
-
-p {
-  line-height: 1.6;
-}
-
-.small {
-  font-size: 13px;
-}
-
-.muted {
-  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
 
 /* ---------------- Header ---------------- */
+
 .top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(18,24,38,0.9);
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, #0f1115, #0d1017);
+  backdrop-filter: blur(10px);
 }
 
 .brandRow {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
 }
 
 .brandLogo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--panel);
+  border: 1px solid var(--border);
 }
 
-.right {
-  display: flex;
-  gap: 10px;
+h1 {
+  margin: 0;
+  font-size: 18px;
 }
 
 /* ---------------- Layout ---------------- */
+
 .container {
-  max-width: 1200px;
-  padding: 22px;
-  margin: auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
 }
+
+.appShell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------- Sidebar ---------------- */
+
+.sideNav {
+  position: sticky;
+  top: 88px;
+  height: calc(100vh - 110px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.navBtn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+}
+
+.navBtn.active {
+  background: rgba(76,139,245,0.18);
+  border-color: rgba(76,139,245,0.4);
+  color: var(--text);
+}
+
+.sideSpacer {
+  flex: 1;
+}
+
+.subCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(15,20,34,0.7);
+}
+
+.subRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ---------------- Panels ---------------- */
+
+.mainPanel {
+  min-width: 0;
+}
+
+.panel {
+  animation: fadeIn 120ms ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: .7; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------- Cards ---------------- */
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
+  border-radius: 16px;
+  padding: 16px;
   box-shadow: var(--shadow);
-  margin-bottom: 18px;
 }
 
 .cardHeader {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
+/* ---------------- Text ---------------- */
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
 /* ---------------- Buttons ---------------- */
+
 .btn {
-  background: var(--primary);
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 10px;
   padding: 10px 14px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .btn.secondary {
-  background: var(--card-2);
+  background: transparent;
+  border: 1px solid var(--border);
   color: var(--text);
 }
 
-.btn.smallBtn {
+.btn.tiny {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
-.btn:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
+.btn.good { background: var(--good); }
+.btn.bad { background: var(--bad); }
 
 /* ---------------- Forms ---------------- */
+
 input, textarea, select {
   width: 100%;
-  padding: 10px 12px;
-  background: #0e1220;
-  color: var(--text);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  outline: none;
+  padding: 10px 12px;
+  color: var(--text);
 }
 
-textarea {
-  resize: vertical;
-}
+textarea { resize: vertical; }
 
 label {
-  display: block;
-  font-size: 14px;
-  margin-bottom: 8px;
-}
-
-.form {
-  display: grid;
-  gap: 12px;
-}
-
-.grid {
-  display: grid;
-  gap: 18px;
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
 }
 
 .row {
@@ -166,39 +219,27 @@ label {
   align-items: center;
 }
 
-/* ---------------- Tabs ---------------- */
-.tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 16px;
 }
 
-.tabBtn {
-  background: var(--card-2);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 10px 14px;
-  border-radius: 10px;
-  cursor: pointer;
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
 }
 
-.tabBtn.active {
-  color: #fff;
-  background: var(--primary);
-  border-color: transparent;
-}
-
-.tabPanel {
-  animation: fade .15s ease;
-}
-
-@keyframes fade {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+@media (max-width: 800px) {
+  .grid, .grid2 { grid-template-columns: 1fr; }
 }
 
 /* ---------------- Tables ---------------- */
+
 .tableWrap {
+  border: 1px solid var(--border);
+  border-radius: 14px;
   overflow-x: auto;
 }
 
@@ -207,118 +248,113 @@ table {
   border-collapse: collapse;
 }
 
-thead {
-  background: #0d1220;
-}
-
-th, td {
-  padding: 12px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  font-size: 14px;
-}
-
-th {
+thead th {
+  font-size: 12px;
   color: var(--muted);
-  font-weight: 500;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
 }
 
-tbody tr:hover {
-  background: #0f1425;
+tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
 }
 
-/* ---------------- KPIs ---------------- */
+/* ---------------- KPI ---------------- */
+
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .kpiGrid { grid-template-columns: repeat(2,1fr); }
 }
 
 .kpiCard {
-  background: var(--card-2);
-  padding: 14px;
-  border-radius: 12px;
+  background: rgba(15,20,34,0.6);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
 }
 
 .kpiLabel {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .kpiValue {
-  font-size: 26px;
-  margin: 4px 0;
+  font-size: 20px;
+  font-weight: 800;
 }
 
-.kpiDelta {
-  font-size: 13px;
+.kpiDelta.up { color: var(--good); }
+.kpiDelta.down { color: var(--bad); }
+
+/* ---------------- Pills ---------------- */
+
+.pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 700;
 }
 
-/* ---------------- Subscription banner ---------------- */
-.subBanner {
-  border-left: 4px solid var(--danger);
+.pill.soft {
+  background: rgba(255,255,255,0.08);
 }
 
-.subBannerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.pill.good {
+  background: rgba(46,229,157,0.15);
+  color: var(--good);
 }
 
-.subBannerText {
-  font-size: 14px;
+.pill.bad {
+  background: rgba(255,92,92,0.15);
+  color: var(--bad);
 }
 
-/* ---------------- Modal ---------------- */
-.modal {
+/* ---------------- Chart ---------------- */
+
+.chartWrap {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(15,20,34,0.6);
+}
+
+/* ---------------- Modal (Payments) ---------------- */
+
+#payModalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
 }
 
-.modalBox {
-  background: var(--card);
-  border-radius: 16px;
-  width: min(560px, 92%);
-  box-shadow: var(--shadow);
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, 92vw);
+  z-index: 1001;
 }
 
-.modalHeader {
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border);
+#payModalProof img {
+  max-width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
-.modalTitle {
-  font-weight: 600;
-}
+/* ---------------- HR ---------------- */
 
-#payModalBody {
-  padding: 14px;
-}
-
-/* ---------------- Status colors ---------------- */
-.status-awaiting {
-  color: #f0c66a;
-}
-.status-confirmed {
-  color: var(--success);
-}
-.status-rejected {
-  color: var(--danger);
-}
-
-/* ---------------- Responsive ---------------- */
-@media (max-width: 700px) {
-  .tabs {
-    flex-wrap: wrap;
-  }
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
 }

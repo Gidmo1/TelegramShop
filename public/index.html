@@ -2,14 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Orderlyy Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
-  
-  <link rel="icon" href="assets/logo.png" />
 
+  <!-- Favicon (put your logo at /assets/favicon.png OR /assets/favicon.ico) -->
+  <link rel="icon" href="assets/favicon.png" type="image/png" />
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+
+  <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
+  <!-- Top header -->
   <header class="top">
     <div class="brandRow">
       <img class="brandLogo" src="assets/logo.png" alt="Orderlyy" onerror="this.style.display='none'"/>
@@ -20,6 +24,7 @@
         </p>
       </div>
     </div>
+
     <div class="right">
       <button id="logoutBtn" class="btn secondary" hidden>Logout</button>
     </div>
@@ -30,277 +35,299 @@
     <section id="login" class="card">
       <h2>Login</h2>
       <p class="muted">Token is your private key. Don’t share it.</p>
+
       <div class="row">
         <input id="tokenInput" placeholder="Paste your token here" />
         <button id="loginBtn" class="btn">Enter</button>
       </div>
-      <p class="muted">
+
+      <p class="muted" style="margin-top:10px;">
         Tip: adding product photos is easiest via the bot (Telegram stores the image and gives a reusable file_id).
         In the dashboard you can paste an existing <code>photo_file_id</code>.
       </p>
     </section>
 
     <!-- APP -->
-    <section id="app" hidden>
+    <section id="app" class="appShell" hidden>
+      <!-- LEFT NAV -->
+      <aside class="sideNav" aria-label="Sidebar navigation">
+        <button class="navBtn active" data-nav="overview">Overview</button>
+        <button class="navBtn" data-nav="products">Products</button>
+        <button class="navBtn" data-nav="orders">Orders</button>
+        <button class="navBtn" data-nav="payments">Payments</button>
+        <button class="navBtn" data-nav="settings">Settings</button>
 
-      <!-- Subscription banner (shows only when inactive/expired) -->
-      <section id="subBanner" class="card subBanner" hidden>
-        <div class="subBannerRow">
-          <div id="subBannerText" class="subBannerText"></div>
-          <div class="subBannerActions">
-            <button id="subBannerBtn" class="btn">Contact support</button>
+        <div class="sideSpacer"></div>
+
+        <div class="subCard">
+          <div class="subRow">
+            <div class="muted small">Subscription</div>
+            <span id="subBadge" class="pill soft">—</span>
           </div>
+          <div id="subText" class="muted small" style="margin-top:8px;">—</div>
+          <a id="subContact" class="btn secondary tiny" href="#" target="_blank" rel="noopener">Support</a>
         </div>
-      </section>
+      </aside>
 
-      <!-- Tabs -->
-      <nav class="tabs" aria-label="Dashboard tabs">
-        <button class="tabBtn active" data-tab="overview">Overview</button>
-        <button class="tabBtn" data-tab="products">Products</button>
-        <button class="tabBtn" data-tab="orders">Orders</button>
-        <button class="tabBtn" data-tab="payments">Payments</button>
-        <button class="tabBtn" data-tab="settings">Settings</button>
-      </nav>
+      <!-- MAIN CONTENT -->
+      <section class="mainPanel">
+        <!-- OVERVIEW -->
+        <section id="panel-overview" class="panel">
+          <section class="grid">
+            <div class="card">
+              <h2>Store</h2>
+              <div id="storeInfo" class="muted">Loading...</div>
+            </div>
 
-      <!-- OVERVIEW TAB -->
-      <section id="tab-overview" class="tabPanel">
-        <section class="grid">
-          <div class="card">
-            <h2>Store</h2>
-            <div id="storeInfo" class="muted">Loading...</div>
-          </div>
+            <div class="card">
+              <div class="cardHeader">
+                <h2>Analytics</h2>
+                <div class="row">
+                  <label class="muted" for="periodSelect" style="margin-right:8px;">Period</label>
+                  <select id="periodSelect">
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d" selected>Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                  </select>
+                </div>
+              </div>
 
-          <div class="card">
+              <div class="kpiGrid">
+                <div class="kpiCard">
+                  <div class="kpiLabel">Orders</div>
+                  <div class="kpiValue" id="kpiOrders">—</div>
+                  <div class="kpiDelta muted" id="kpiOrdersDelta">—</div>
+                </div>
+
+                <div class="kpiCard">
+                  <div class="kpiLabel">Revenue</div>
+                  <div class="kpiValue" id="kpiRevenue">—</div>
+                  <div class="kpiDelta muted" id="kpiRevenueDelta">—</div>
+                </div>
+
+                <div class="kpiCard">
+                  <div class="kpiLabel">Pending</div>
+                  <div class="kpiValue" id="kpiPending">—</div>
+                  <div class="kpiDelta muted" id="kpiPendingDelta">—</div>
+                </div>
+
+                <div class="kpiCard">
+                  <div class="kpiLabel">Products</div>
+                  <div class="kpiValue" id="kpiProducts">—</div>
+                  <div class="kpiDelta muted" id="kpiProductsDelta">—</div>
+                </div>
+              </div>
+
+              <div class="chartWrap">
+                <canvas id="ordersChart" height="140"></canvas>
+              </div>
+
+              <div class="muted small" id="analyticsMsg" style="margin-top:10px;"></div>
+            </div>
+          </section>
+        </section>
+
+        <!-- PRODUCTS -->
+        <section id="panel-products" class="panel" hidden>
+          <section class="card">
             <div class="cardHeader">
-              <h2>Analytics</h2>
+              <h2>Products</h2>
+              <button id="refreshProducts" class="btn secondary">Refresh</button>
+            </div>
+
+            <form id="productForm" class="form">
+              <div class="grid2">
+                <label>
+                  Name
+                  <input name="name" required />
+                </label>
+                <label>
+                  Price (number)
+                  <input name="price" type="number" required />
+                </label>
+              </div>
+
+              <label>
+                Description
+                <textarea name="description" rows="2"></textarea>
+              </label>
+
+              <div class="grid2">
+                <label>
+                  In stock
+                  <select name="in_stock">
+                    <option value="1">Yes</option>
+                    <option value="0">No</option>
+                  </select>
+                </label>
+
+                <label>
+                  Photo file_id (optional)
+                  <input name="photo_file_id" placeholder="Paste Telegram file_id" />
+                </label>
+              </div>
+
               <div class="row">
-                <label class="muted" for="periodSelect" style="margin-right:8px;">Period</label>
-                <select id="periodSelect" class="select">
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d" selected>Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
+                <button class="btn" type="submit">Add product</button>
+                <button id="clearForm" class="btn secondary" type="button">Clear</button>
+              </div>
+
+              <div id="productFormMsg" class="muted small" style="margin-top:8px;"></div>
+            </form>
+
+            <div class="tableWrap" style="margin-top:14px;">
+              <table id="productsTable">
+                <thead>
+                  <tr>
+                    <th style="min-width:220px;">Name</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th style="min-width:220px;">Photo</th>
+                    <th style="min-width:170px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <!-- ORDERS -->
+        <section id="panel-orders" class="panel" hidden>
+          <section class="card">
+            <div class="cardHeader">
+              <h2>Orders</h2>
+              <button id="refreshOrders" class="btn secondary">Refresh</button>
+            </div>
+
+            <div class="tableWrap" style="margin-top:14px;">
+              <table id="ordersTable">
+                <thead>
+                  <tr>
+                    <th style="min-width:220px;">Order ID</th>
+                    <th style="min-width:180px;">Product</th>
+                    <th>Buyer</th>
+                    <th>Qty</th>
+                    <th>Status</th>
+                    <th style="min-width:260px;">Delivery details</th>
+                    <th style="min-width:170px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <!-- PAYMENTS -->
+        <section id="panel-payments" class="panel" hidden>
+          <section class="card">
+            <div class="cardHeader">
+              <h2>Payments</h2>
+              <div class="row">
+                <label class="muted small" for="paymentsStatus" style="margin-right:8px;">Status</label>
+                <select id="paymentsStatus">
+                  <option value="">All</option>
+                  <option value="awaiting">Awaiting</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="rejected">Rejected</option>
                 </select>
+                <button id="refreshPayments" class="btn secondary">Refresh</button>
               </div>
             </div>
 
-            <!-- KPI cards -->
-            <div class="kpiGrid">
-              <div class="kpiCard">
-                <div class="kpiLabel">Orders</div>
-                <div class="kpiValue" id="kpiOrders">—</div>
-                <div class="kpiDelta muted" id="kpiOrdersDelta">—</div>
+            <div id="paymentsMsg" class="muted small" style="margin-top:8px;"></div>
+
+            <div class="tableWrap" style="margin-top:14px;">
+              <table id="paymentsTable">
+                <thead>
+                  <tr>
+                    <th style="min-width:220px;">Payment ID</th>
+                    <th style="min-width:220px;">Order ID</th>
+                    <th style="min-width:170px;">Product</th>
+                    <th>Buyer</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th style="min-width:260px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <p class="muted small" style="margin-top:10px;">
+              Tip: “View” opens the receipt proof preview. Approving asks buyer for delivery details automatically.
+            </p>
+          </section>
+        </section>
+
+        <!-- SETTINGS -->
+        <section id="panel-settings" class="panel" hidden>
+          <section class="card">
+            <div class="cardHeader">
+              <h2>Settings</h2>
+            </div>
+
+            <h3 style="margin-top:0;">Bank details (manual transfer)</h3>
+            <p class="muted small">These details are shown to buyers after they place an order.</p>
+
+            <form id="bankForm" class="form" autocomplete="off">
+              <div class="grid2">
+                <label>
+                  Bank name
+                  <input id="bank_name" name="bank_name" placeholder="e.g. Opay / Kuda / GTBank" required />
+                </label>
+
+                <label>
+                  Account number (10 digits)
+                  <input id="account_number" name="account_number" inputmode="numeric" placeholder="0123456789" required />
+                </label>
               </div>
 
-              <div class="kpiCard">
-                <div class="kpiLabel">Revenue</div>
-                <div class="kpiValue" id="kpiRevenue">—</div>
-                <div class="kpiDelta muted" id="kpiRevenueDelta">—</div>
+              <label>
+                Account name
+                <input id="account_name" name="account_name" placeholder="Account holder name" required />
+              </label>
+
+              <div class="row">
+                <button class="btn" type="submit">Save</button>
               </div>
 
-              <div class="kpiCard">
-                <div class="kpiLabel">Pending</div>
-                <div class="kpiValue" id="kpiPending">—</div>
-                <div class="kpiDelta muted" id="kpiPendingDelta">—</div>
-              </div>
+              <div id="bankMsg" class="muted small" style="margin-top:8px;"></div>
+            </form>
 
-              <div class="kpiCard">
-                <div class="kpiLabel">Products</div>
-                <div class="kpiValue" id="kpiProducts">—</div>
-                <div class="kpiDelta muted" id="kpiProductsDelta">—</div>
-              </div>
-            </div>
+            <hr />
 
-            <!-- Chart -->
-            <div class="chartWrap">
-              <canvas id="ordersChart" height="140"></canvas>
-            </div>
-
-            <div class="muted" id="analyticsMsg"></div>
-          </div>
+            <h3>Favicon</h3>
+            <p class="muted small">
+              Put a square image at <code>assets/favicon.png</code> (recommended) or <code>assets/favicon.ico</code>.
+              It’s already linked in the <code>&lt;head&gt;</code>.
+            </p>
+          </section>
         </section>
       </section>
-
-      <!-- PRODUCTS TAB -->
-      <section id="tab-products" class="tabPanel" hidden>
-        <section class="card">
-          <div class="cardHeader">
-            <h2>Products</h2>
-            <button id="refreshProducts" class="btn secondary">Refresh</button>
-          </div>
-
-          <form id="productForm" class="form">
-            <div class="grid2">
-              <label>
-                Name
-                <input name="name" required />
-              </label>
-              <label>
-                Price (number)
-                <input name="price" type="number" required />
-              </label>
-            </div>
-
-            <label>
-              Description
-              <textarea name="description" rows="2"></textarea>
-            </label>
-
-            <div class="grid2">
-              <label>
-                In stock
-                <select name="in_stock">
-                  <option value="1">Yes</option>
-                  <option value="0">No</option>
-                </select>
-              </label>
-              <label>
-                Photo file_id (optional)
-                <input name="photo_file_id" placeholder="Paste Telegram file_id" />
-              </label>
-            </div>
-
-            <div class="row">
-              <button class="btn" type="submit">Add product</button>
-              <button id="clearForm" class="btn secondary" type="button">Clear</button>
-            </div>
-            <div id="productFormMsg" class="muted"></div>
-          </form>
-
-          <div class="tableWrap">
-            <table id="productsTable">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th>Photo</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
-
-      <!-- ORDERS TAB -->
-      <section id="tab-orders" class="tabPanel" hidden>
-        <section class="card">
-          <div class="cardHeader">
-            <h2>Orders</h2>
-            <button id="refreshOrders" class="btn secondary">Refresh</button>
-          </div>
-
-          <div class="tableWrap">
-            <table id="ordersTable">
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Product</th>
-                  <th>Buyer</th>
-                  <th>Qty</th>
-                  <th>Status</th>
-                  <th>Delivery details</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
-
-      <!-- PAYMENTS TAB -->
-      <section id="tab-payments" class="tabPanel" hidden>
-        <section class="card">
-          <div class="cardHeader">
-            <h2>Payments</h2>
-            <div class="row">
-              <select id="paymentsStatusFilter" class="select" title="Filter">
-                <option value="">All</option>
-                <option value="awaiting">Awaiting</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <button id="refreshPayments" class="btn secondary">Refresh</button>
-            </div>
-          </div>
-
-          <div class="tableWrap">
-            <table id="paymentsTable">
-              <thead>
-                <tr>
-                  <th>Payment ID</th>
-                  <th>Order</th>
-                  <th>Product</th>
-                  <th>Buyer</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-          <p class="muted small" style="margin-top:10px;">
-            Tip: Use <b>View</b> to preview proof. Approve/Reject will notify the buyer automatically.
-          </p>
-        </section>
-      </section>
-
-      <!-- SETTINGS TAB -->
-      <section id="tab-settings" class="tabPanel" hidden>
-        <section class="card">
-          <div class="cardHeader">
-            <h2>Settings</h2>
-          </div>
-
-          <h3 style="margin: 6px 0 10px 0;">Bank details</h3>
-          <p class="muted small" style="margin-top:0;">
-            These details are shown to buyers for manual bank transfer.
-          </p>
-
-          <form id="bankForm" class="form">
-            <div class="grid2">
-              <label>
-                Bank name
-                <input id="bankName" placeholder="e.g. Opay, Moniepoint, GTBank" required />
-              </label>
-
-              <label>
-                Account number
-                <input id="accountNumber" inputmode="numeric" placeholder="10-digit account number" required />
-              </label>
-            </div>
-
-            <label>
-              Account name
-              <input id="accountName" placeholder="Account name on bank" required />
-            </label>
-
-            <div class="row">
-              <button class="btn" type="submit">Save bank details</button>
-            </div>
-
-            <div id="bankMsg" class="muted"></div>
-          </form>
-        </section>
-      </section>
-
     </section>
   </main>
 
-  <!-- Payment modal -->
-  <div id="payModal" class="modal" hidden>
-    <div class="modalBox">
-      <div class="modalHeader">
-        <div id="payModalTitle" class="modalTitle">Payment</div>
-        <button id="payModalClose" class="btn secondary smallBtn" type="button">Close</button>
-      </div>
-      <div id="payModalBody"></div>
+  <!-- Payment Modal -->
+  <div id="payModalBackdrop" hidden></div>
+
+  <section id="payModal" class="card modal" hidden aria-label="Payment details modal">
+    <div class="cardHeader">
+      <h2 id="payModalTitle">Payment</h2>
+      <button id="payModalClose" class="btn secondary tiny" type="button">Close</button>
     </div>
-  </div>
+
+    <div id="payModalMeta" class="muted small">Loading...</div>
+
+    <hr />
+
+    <div id="payModalProof"></div>
+
+    <hr />
+
+    <div id="payModalActions" class="row" style="justify-content:flex-end; gap:10px;"></div>
+  </section>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
