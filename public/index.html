@@ -13,9 +13,7 @@
 <body>
   <!-- Top Bar -->
   <header class="topbar">
-    <button id="hamburger" class="iconBtn" aria-label="Open menu" title="Menu">
-      ☰
-    </button>
+    <button id="hamburger" class="iconBtn" aria-label="Open menu" title="Menu">☰</button>
 
     <div class="brandRow">
       <img class="brandLogo" src="assets/logo.png" alt="Orderlyy" onerror="this.style.display='none'"/>
@@ -327,6 +325,23 @@
       </section>
     </section>
   </main>
+
+  <!-- Proof Modal (needed for View proof button) -->
+  <div id="proofModal" class="modal" hidden>
+    <div class="modalCard" role="dialog" aria-modal="true" aria-label="Payment proof">
+      <div class="modalHeader">
+        <div>
+          <div class="modalTitle">Payment proof</div>
+          <div id="proofMeta" class="muted small"></div>
+        </div>
+        <button id="proofClose" class="iconBtn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modalBody">
+        <img id="proofImg" class="proofImg" alt="Proof image" />
+      </div>
+    </div>
+  </div>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

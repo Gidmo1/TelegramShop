@@ -4,12 +4,14 @@
 
   const TOKEN_KEY = "orderlyy_token";
 
+  // Auth
   const loginSection = $("login");
   const appSection = $("app");
   const tokenInput = $("tokenInput");
   const loginBtn = $("loginBtn");
   const logoutBtn = $("logoutBtn");
 
+  // Sidebar / nav
   const sidebar = $("sidebar");
   const hamburger = $("hamburger");
   const backdrop = $("backdrop");
@@ -23,6 +25,7 @@
     settings: $("page-settings"),
   };
 
+  // Overview / analytics
   const storeInfo = $("storeInfo");
   const periodSelect = $("periodSelect");
   const analyticsMsg = $("analyticsMsg");
@@ -39,6 +42,7 @@
   const ordersChartCanvas = $("ordersChart");
   let ordersChart = null;
 
+  // Products
   const refreshProductsBtn = $("refreshProducts");
   const productForm = $("productForm");
   const productFormMsg = $("productFormMsg");
@@ -46,21 +50,25 @@
   const productsTable = $("productsTable");
   const productsTbody = productsTable ? productsTable.querySelector("tbody") : null;
 
+  // Orders
   const refreshOrdersBtn = $("refreshOrders");
   const ordersTable = $("ordersTable");
   const ordersTbody = ordersTable ? ordersTable.querySelector("tbody") : null;
 
+  // Payments
   const refreshPaymentsBtn = $("refreshPayments");
   const paymentStatusFilter = $("paymentStatusFilter");
   const paymentsMsg = $("paymentsMsg");
   const paymentsTable = $("paymentsTable");
   const paymentsTbody = paymentsTable ? paymentsTable.querySelector("tbody") : null;
 
+  // Proof modal
   const proofModal = $("proofModal");
   const proofImg = $("proofImg");
   const proofClose = $("proofClose");
   const proofMeta = $("proofMeta");
 
+  // Settings
   const settingsStoreInfo = $("settingsStoreInfo");
   const bankForm = $("bankForm");
   const bankClear = $("bankClear");
@@ -72,14 +80,17 @@
   const copyMsg = $("copyMsg");
   const settingsSupportLink = $("settingsSupportLink");
 
+  // Footer
   const subPill = $("subPill");
   const supportLinkEl = $("supportLink");
 
+  // Cache
   let cachedStore = null;
   let cachedProducts = [];
   let cachedOrders = [];
   let cachedPayments = [];
 
+  // ---------------- Token helpers ----------------
   function getTokenFromUrl() {
     try {
       const url = new URL(location.href);
@@ -92,6 +103,7 @@
   function getToken() { return (localStorage.getItem(TOKEN_KEY) || "").trim(); }
   function clearToken() { localStorage.removeItem(TOKEN_KEY); }
 
+  // ---------------- Utils ----------------
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;",
@@ -117,6 +129,7 @@
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
+  // ---------------- API ----------------
   async function api(path, { method = "GET", body } = {}) {
     const token = getToken();
     const headers = { "content-type": "application/json" };
@@ -138,6 +151,7 @@
     return data;
   }
 
+  // ---------------- UI show/hide ----------------
   function showLogin() {
     if (loginSection) loginSection.hidden = false;
     if (appSection) appSection.hidden = true;
@@ -150,6 +164,7 @@
     if (logoutBtn) logoutBtn.hidden = false;
   }
 
+  // ---------------- Sidebar ----------------
   function openSidebar() {
     if (!sidebar || !backdrop) return;
     sidebar.classList.add("open");
@@ -161,9 +176,9 @@
     backdrop.hidden = true;
   }
 
+  // ---------------- Pages ----------------
   function setActivePage(name) {
     navBtns.forEach((b) => b.classList.toggle("active", b.dataset.page === name));
-
     Object.entries(pages).forEach(([k, el]) => {
       if (!el) return;
       el.hidden = k !== name;
@@ -178,6 +193,7 @@
     if (name === "settings") renderSettings();
   }
 
+  // ---------------- Subscription UI ----------------
   function setSubUI(store) {
     if (!store) return;
 
@@ -204,7 +220,7 @@
   }
 
   function writeBlockedMsg(e) {
-    if (e && e.status === 402 && (e.message || "").includes("subscription_required")) {
+    if (e && e.status === 402 && String(e.message || "").includes("subscription_required")) {
       const sup =
         cachedStore?.support_link ||
         (cachedStore?.support_username ? `https://t.me/${cachedStore.support_username}` : "https://t.me/orderlyysupport");
@@ -213,6 +229,7 @@
     return e?.message || "Something went wrong.";
   }
 
+  // ---------------- KPI triangles ----------------
   function setDelta(el, pct) {
     if (!el) return;
     const n = Number(pct);
@@ -253,28 +270,21 @@
     const options = {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: true },
-      },
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
     };
 
     if (!ordersChart) {
-      ordersChart = new Chart(ordersChartCanvas.getContext("2d"), {
-        type: "line",
-        data,
-        options,
-      });
+      ordersChart = new Chart(ordersChartCanvas.getContext("2d"), { type: "line", data, options });
     } else {
       ordersChart.data = data;
       ordersChart.update();
     }
   }
 
+  // ---------------- Load store ----------------
   async function loadStore() {
     const out = await api("/api/store");
     cachedStore = out.store || null;
-
     setSubUI(cachedStore);
 
     if (storeInfo && cachedStore) {
@@ -300,6 +310,7 @@
     return cachedStore;
   }
 
+  // ---------------- Analytics ----------------
   async function loadAnalytics() {
     if (!cachedStore) return;
 
@@ -338,6 +349,7 @@
     }
   }
 
+  // ---------------- Products ----------------
   async function loadProducts() {
     const out = await api("/api/products");
     cachedProducts = out.products || [];
@@ -412,7 +424,6 @@
 
   async function addProductFromForm() {
     if (!productForm || !productFormMsg) return;
-
     productFormMsg.textContent = "";
 
     const fd = new FormData(productForm);
@@ -427,10 +438,7 @@
       return;
     }
 
-    await api("/api/products", {
-      method: "POST",
-      body: { name, price, description, in_stock, photo_file_id },
-    });
+    await api("/api/products", { method: "POST", body: { name, price, description, in_stock, photo_file_id } });
 
     productForm.reset();
     const stockSel = productForm.querySelector('select[name="in_stock"]');
@@ -442,6 +450,7 @@
     await loadAnalytics();
   }
 
+  // ---------------- Orders ----------------
   async function loadOrders() {
     const out = await api("/api/orders");
     cachedOrders = out.orders || [];
@@ -455,7 +464,9 @@
 
     for (const o of cachedOrders) {
       const buyer = o.buyer_username ? "@"+escapeHtml(o.buyer_username) : '<span class="muted">(unknown)</span>';
-      const delivery = o.delivery_text ? `<div class="small muted" style="margin-top:6px; white-space:pre-wrap">${escapeHtml(o.delivery_text)}</div>` : "";
+      const delivery = o.delivery_text
+        ? `<div class="small muted" style="margin-top:6px; white-space:pre-wrap">${escapeHtml(o.delivery_text)}</div>`
+        : "";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -474,12 +485,10 @@
   }
 
   async function setOrderStatus(orderId, status) {
-    await api(`/api/orders/${encodeURIComponent(orderId)}/status`, {
-      method: "PUT",
-      body: { status },
-    });
+    await api(`/api/orders/${encodeURIComponent(orderId)}/status`, { method: "PUT", body: { status } });
   }
 
+  // ---------------- Payments ----------------
   function showPaymentsMsg(e) {
     if (!paymentsMsg) return;
     paymentsMsg.textContent = e ? writeBlockedMsg(e) : "";
@@ -517,7 +526,7 @@
       const actions =
         status === "awaiting"
           ? `
-            <button class="btn tiny okBtn" data-act="approve" data-id="${escapeHtml(p.id)}">Approve</button>
+            <button class="btn tiny" data-act="approve" data-id="${escapeHtml(p.id)}">Approve</button>
             <button class="btn tiny danger" data-act="reject" data-id="${escapeHtml(p.id)}">Reject</button>
           `
           : `<span class="muted small">—</span>`;
@@ -538,22 +547,23 @@
     }
   }
 
+  // IMPORTANT FIX:
+  // <img> cannot send Authorization header, so we must append token as query param.
+  // Also add cache-buster so it reloads.
   function openProofModal(paymentId) {
     if (!proofModal || !proofImg) return;
 
-    // show modal first (so user sees something)
     proofModal.hidden = false;
 
-    // clear old image + force reload
+    // clear old and force reload
     proofImg.removeAttribute("src");
-    proofImg.alt = "Loading proof...";
+    proofImg.alt = "Loading proof…";
 
     const token = getToken();
-    // IMPORTANT: img won't send Authorization header, so attach token
-    const url = `/api/payments/${encodeURIComponent(paymentId)}/proof?token=${encodeURIComponent(token)}`;
+    const base = `/api/payments/${encodeURIComponent(paymentId)}/proof`;
+    const url = `${base}?token=${encodeURIComponent(token)}&_=${Date.now()}`;
 
-    // add a cache buster so it always refreshes
-    proofImg.src = `${url}&_=${Date.now()}`;
+    proofImg.src = url;
 
     const p = cachedPayments.find((x) => x.id === paymentId);
     if (proofMeta) {
@@ -564,12 +574,11 @@
         : "";
     }
 
-    // if proof fails to load, show a clear error
     proofImg.onerror = () => {
       proofImg.alt = "Failed to load proof";
       if (proofMeta) {
         proofMeta.innerHTML += `<div class="muted small" style="margin-top:10px;">
-          Could not load proof. Check: payment has proof_file_id + endpoint works + token is valid.
+          Failed to load proof. (Most common cause: missing token on the image request.)
         </div>`;
       }
     };
@@ -582,14 +591,6 @@
     proofImg.onerror = null;
   }
 
-  // Modal close wiring (MAKE SURE THIS EXISTS)
-  if (proofClose) proofClose.addEventListener("click", closeProofModal);
-  if (proofModal) {
-    proofModal.addEventListener("click", (e) => {
-      // close only when clicking the dark background, not the modal content
-      if (e.target === proofModal) closeProofModal();
-    });
-  }
   async function approvePayment(paymentId) {
     await api(`/api/payments/${encodeURIComponent(paymentId)}/approve`, { method: "PUT" });
   }
@@ -598,6 +599,7 @@
     await api(`/api/payments/${encodeURIComponent(paymentId)}/reject`, { method: "PUT" });
   }
 
+  // ---------------- Settings ----------------
   function renderSettings() {
     if (!cachedStore) return;
 
@@ -645,7 +647,6 @@
 
   async function saveBankDetails() {
     if (!bankForm || !bankMsg) return;
-
     bankMsg.textContent = "";
 
     const bank_name = String(bankForm.querySelector('input[name="bank_name"]')?.value || "").trim();
@@ -658,10 +659,7 @@
     }
 
     try {
-      await api("/api/store/bank", {
-        method: "PUT",
-        body: { bank_name, account_number, account_name },
-      });
+      await api("/api/store/bank", { method: "PUT", body: { bank_name, account_number, account_name } });
       bankMsg.textContent = "Saved ✅";
       await loadStore();
       renderSettings();
@@ -674,10 +672,7 @@
     if (!copyMsg) return;
 
     const token = getToken();
-    if (!token) {
-      copyMsg.textContent = "No token.";
-      return;
-    }
+    if (!token) { copyMsg.textContent = "No token."; return; }
 
     const base = location.origin + location.pathname;
     const link = `${base}?token=${encodeURIComponent(token)}`;
@@ -686,10 +681,11 @@
       await navigator.clipboard.writeText(link);
       copyMsg.textContent = "Copied ✅";
     } catch {
-      copyMsg.textContent = "Copy failed. (Your browser blocked clipboard)";
+      copyMsg.textContent = "Copy failed. (Browser blocked clipboard)";
     }
   }
 
+  // ---------------- Core loading ----------------
   async function loadAllCore() {
     await loadStore();
     await Promise.all([
@@ -707,13 +703,12 @@
     setActivePage("overview");
   }
 
+  // ---------------- Wiring ----------------
   function wireEvents() {
     if (hamburger) hamburger.addEventListener("click", openSidebar);
     if (backdrop) backdrop.addEventListener("click", closeSidebar);
 
-    navBtns.forEach((btn) => {
-      btn.addEventListener("click", () => setActivePage(btn.dataset.page));
-    });
+    navBtns.forEach((btn) => btn.addEventListener("click", () => setActivePage(btn.dataset.page)));
 
     if (loginBtn) {
       loginBtn.addEventListener("click", async () => {
@@ -736,13 +731,9 @@
       });
     }
 
-    if (periodSelect) {
-      periodSelect.addEventListener("change", () => loadAnalytics().catch(() => {}));
-    }
+    if (periodSelect) periodSelect.addEventListener("change", () => loadAnalytics().catch(() => {}));
 
-    if (refreshProductsBtn) {
-      refreshProductsBtn.addEventListener("click", () => loadProducts().catch((e) => alert(e.message)));
-    }
+    if (refreshProductsBtn) refreshProductsBtn.addEventListener("click", () => loadProducts().catch((e) => alert(e.message)));
 
     if (productsTbody) {
       productsTbody.addEventListener("click", async (ev) => {
@@ -790,9 +781,7 @@
       });
     }
 
-    if (refreshOrdersBtn) {
-      refreshOrdersBtn.addEventListener("click", () => loadOrders().catch((e) => alert(e.message)));
-    }
+    if (refreshOrdersBtn) refreshOrdersBtn.addEventListener("click", () => loadOrders().catch((e) => alert(e.message)));
 
     if (ordersTbody) {
       ordersTbody.addEventListener("click", async (ev) => {
@@ -813,12 +802,8 @@
       });
     }
 
-    if (refreshPaymentsBtn) {
-      refreshPaymentsBtn.addEventListener("click", () => loadPayments().catch((e) => showPaymentsMsg(e)));
-    }
-    if (paymentStatusFilter) {
-      paymentStatusFilter.addEventListener("change", () => loadPayments().catch((e) => showPaymentsMsg(e)));
-    }
+    if (refreshPaymentsBtn) refreshPaymentsBtn.addEventListener("click", () => loadPayments().catch((e) => showPaymentsMsg(e)));
+    if (paymentStatusFilter) paymentStatusFilter.addEventListener("change", () => loadPayments().catch((e) => showPaymentsMsg(e)));
 
     if (paymentsTbody) {
       paymentsTbody.addEventListener("click", async (ev) => {
@@ -829,10 +814,7 @@
         if (!act || !id) return;
 
         try {
-          if (act === "proof") {
-            openProofModal(id);
-            return;
-          }
+          if (act === "proof") { openProofModal(id); return; }
           if (act === "approve") {
             if (!confirm("Approve this payment?")) return;
             await approvePayment(id);
@@ -853,6 +835,7 @@
       });
     }
 
+    // Modal close
     if (proofClose) proofClose.addEventListener("click", closeProofModal);
     if (proofModal) {
       proofModal.addEventListener("click", (e) => {
@@ -860,6 +843,7 @@
       });
     }
 
+    // Settings
     if (bankForm) {
       bankForm.addEventListener("submit", (ev) => {
         ev.preventDefault();
@@ -868,19 +852,16 @@
         });
       });
     }
-
     if (bankClear && bankForm) {
       bankClear.addEventListener("click", () => {
         bankForm.reset();
         if (bankMsg) bankMsg.textContent = "";
       });
     }
-
-    if (copyDashLink) {
-      copyDashLink.addEventListener("click", () => copyDashboardLink());
-    }
+    if (copyDashLink) copyDashLink.addEventListener("click", () => copyDashboardLink());
   }
 
+  // ---------------- Boot ----------------
   async function boot() {
     const urlToken = getTokenFromUrl();
     const existing = getToken();
