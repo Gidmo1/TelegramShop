@@ -541,28 +541,55 @@
   function openProofModal(paymentId) {
     if (!proofModal || !proofImg) return;
 
-    proofImg.src = "";
+    // show modal first (so user sees something)
     proofModal.hidden = false;
 
-    // ✅ IMPORTANT FIX: add ?token=... because <img> does not send Authorization header
+    // clear old image + force reload
+    proofImg.removeAttribute("src");
+    proofImg.alt = "Loading proof...";
+
     const token = getToken();
+    // IMPORTANT: img won't send Authorization header, so attach token
     const url = `/api/payments/${encodeURIComponent(paymentId)}/proof?token=${encodeURIComponent(token)}`;
-    proofImg.src = url;
+
+    // add a cache buster so it always refreshes
+    proofImg.src = `${url}&_=${Date.now()}`;
 
     const p = cachedPayments.find((x) => x.id === paymentId);
     if (proofMeta) {
       proofMeta.innerHTML = p
-        ? `Order: <code>${escapeHtml(p.order_id || "")}</code> · Buyer: <b>${escapeHtml(p.buyer_username ? "@"+p.buyer_username : (p.buyer_id || ""))}</b>`
+        ? `Order: <code>${escapeHtml(p.order_id || "")}</code> · Buyer: <b>${escapeHtml(
+            p.buyer_username ? "@" + p.buyer_username : (p.buyer_id || "")
+          )}</b>`
         : "";
     }
+
+    // if proof fails to load, show a clear error
+    proofImg.onerror = () => {
+      proofImg.alt = "Failed to load proof";
+      if (proofMeta) {
+        proofMeta.innerHTML += `<div class="muted small" style="margin-top:10px;">
+          Could not load proof. Check: payment has proof_file_id + endpoint works + token is valid.
+        </div>`;
+      }
+    };
   }
 
   function closeProofModal() {
     if (!proofModal || !proofImg) return;
     proofModal.hidden = true;
-    proofImg.src = "";
+    proofImg.removeAttribute("src");
+    proofImg.onerror = null;
   }
 
+  // Modal close wiring (MAKE SURE THIS EXISTS)
+  if (proofClose) proofClose.addEventListener("click", closeProofModal);
+  if (proofModal) {
+    proofModal.addEventListener("click", (e) => {
+      // close only when clicking the dark background, not the modal content
+      if (e.target === proofModal) closeProofModal();
+    });
+  }
   async function approvePayment(paymentId) {
     await api(`/api/payments/${encodeURIComponent(paymentId)}/approve`, { method: "PUT" });
   }
