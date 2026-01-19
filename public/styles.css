@@ -340,6 +340,22 @@ code { color: #c7d4ff; }
   flex-wrap: wrap;
 }
 
+/* ✅ Plan box layout (used by renderSettings) */
+.planRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .planRow { grid-template-columns: 1fr; }
+}
+.big {
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
 /* Modal (proof preview) */
 .modal {
   position: fixed;

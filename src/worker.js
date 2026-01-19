@@ -286,6 +286,85 @@ async function tgGetFileUrl(env, file_id) {
   return `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file_path}`;
 }
 
+/* Receipts (text) */
+
+function isReceiptTriggerStatus(status) {
+  const s = String(status || "").toLowerCase();
+  return s === "delivered" || s === "done";
+}
+
+async function maybeCreateAndSendReceipt(env, orderId) {
+  // already exists?
+  const existing = await dbOne(env.DB.prepare("SELECT id FROM receipts WHERE order_id = ?").bind(orderId));
+  if (existing) return;
+
+  const order = await dbOne(env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(orderId));
+  if (!order) return;
+
+  // only send receipt for delivered/done
+  if (!isReceiptTriggerStatus(order.status)) return;
+
+  const store = await dbOne(env.DB.prepare("SELECT * FROM stores WHERE id = ?").bind(order.store_id));
+  if (!store) return;
+
+  const product = await dbOne(env.DB.prepare("SELECT * FROM products WHERE id = ?").bind(order.product_id));
+  const productName = product?.name || "";
+  const qty = asNumber(order.qty);
+  const amount = asNumber(product?.price) * qty;
+
+  const receiptId = crypto.randomUUID();
+
+  // insert receipt (unique index prevents dup; but we also pre-checked)
+  try {
+    await env.DB.prepare(`
+      INSERT INTO receipts (
+        id, store_id, order_id, buyer_id, buyer_username,
+        currency, amount, product_name, qty, delivery_text, status, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      receiptId,
+      String(order.store_id),
+      String(order.id),
+      String(order.buyer_id),
+      String(order.buyer_username || ""),
+      String(store.currency || ""),
+      amount,
+      String(productName),
+      qty,
+      String(order.delivery_text || ""),
+      String(order.status || ""),
+    ).run();
+  } catch {
+    // if duplicate happens due to race, just stop
+    return;
+  }
+
+  const buyerChatId = Number(order.buyer_id);
+  if (!Number.isFinite(buyerChatId)) return;
+
+  const statusLabel = String(order.status || "").toUpperCase();
+  const when = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+
+  const text =
+    `🧾 <b>Receipt</b>\n` +
+    `<b>${escapeHtml(store.name || "Orderlyy Store")}</b>\n\n` +
+    `Order Ref: <code>${escapeHtml(order.id)}</code>\n` +
+    `Item: <b>${escapeHtml(productName)}</b>\n` +
+    `Qty: <b>${escapeHtml(String(qty))}</b>\n` +
+    `Total: <b>${escapeHtml(moneyAmount(store.currency, amount))}</b>\n` +
+    `Status: <b>${escapeHtml(statusLabel)}</b>\n` +
+    `Time: <code>${escapeHtml(when)}</code>\n` +
+    (order.delivery_text ? `\nDelivery:\n<pre>${escapeHtml(order.delivery_text)}</pre>\n` : "\n") +
+    `Thanks for shopping ❤️`;
+
+  try {
+    await tgSendMessage(env, buyerChatId, text);
+  } catch {
+    // ignore send failure
+  }
+}
+
 /* Analytics */
 
 function clampPeriod(period) {
@@ -336,10 +415,10 @@ async function handleAnalytics(env, store, request) {
        AND o.created_at >= datetime('now', ?)
     ) AS pending_total
 `).bind(
-  store.id, `-${days} days`,
-  store.id, `-${days} days`,
-  store.id, `-${days} days`
-));
+    store.id, `-${days} days`,
+    store.id, `-${days} days`,
+    store.id, `-${days} days`
+  ));
 
   const prevAgg = await dbOne(env.DB.prepare(`
   SELECT
@@ -365,10 +444,10 @@ async function handleAnalytics(env, store, request) {
        AND o.created_at <  datetime('now', ?)
     ) AS pending_total
 `).bind(
-  store.id, `-${days * 2} days`, `-${days} days`,
-  store.id, `-${days * 2} days`, `-${days} days`,
-  store.id, `-${days * 2} days`, `-${days} days`
-));
+    store.id, `-${days * 2} days`, `-${days} days`,
+    store.id, `-${days * 2} days`, `-${days} days`,
+    store.id, `-${days * 2} days`, `-${days} days`
+  ));
 
   const curProducts = await dbOne(env.DB.prepare(`
     SELECT COUNT(*) AS products_total
@@ -586,6 +665,11 @@ async function handleApi(env, request) {
     await env.DB.prepare(
       "UPDATE orders SET status = ? WHERE id = ? AND store_id = ?"
     ).bind(status, orderId, store.id).run();
+
+    // Receipt trigger for dashboard status changes
+    if (isReceiptTriggerStatus(status)) {
+      try { await maybeCreateAndSendReceipt(env, orderId); } catch {}
+    }
 
     return json({ ok: true });
   }
@@ -1231,7 +1315,11 @@ async function handleTelegram(env, request) {
       if (!(await requireActiveStoreOrExplain(env, chatId, freshStore))) return json({ ok: true });
 
       await setState(env, userId, { step: "link:channel", data: {} });
-      await tgSendMessage(env, chatId, "Send your channel @username OR forward a message from your channel.\n\nAlso: add me as <b>Admin</b> in the channel first.");
+      await tgSendMessage(
+        env,
+        chatId,
+        "Send your channel @username OR forward a message from your channel.\n\nAlso: add me as <b>Admin</b> in the channel first."
+      );
       return json({ ok: true });
     }
 
@@ -1374,6 +1462,12 @@ async function handleTelegram(env, request) {
 
       await tgSendMessage(env, chatId, `Updated ✅ ${statusText}\nOrder Ref: <code>${escapeHtml(orderId)}</code>`);
       await notifyBuyerStatus(env, Number(order.buyer_id), orderId, statusText);
+
+      // Receipt trigger for bot status changes (delivered)
+      if (isReceiptTriggerStatus(newStatus)) {
+        try { await maybeCreateAndSendReceipt(env, orderId); } catch {}
+      }
+
       return json({ ok: true });
     }
 
@@ -1411,3 +1505,4 @@ export default {
     }
   },
 };
+```0

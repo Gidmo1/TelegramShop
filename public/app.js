@@ -99,9 +99,15 @@
       return "";
     }
   }
-  function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
-  function getToken() { return (localStorage.getItem(TOKEN_KEY) || "").trim(); }
-  function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+  function setToken(t) {
+    localStorage.setItem(TOKEN_KEY, t);
+  }
+  function getToken() {
+    return (localStorage.getItem(TOKEN_KEY) || "").trim();
+  }
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+  }
 
   // ---------------- Utils ----------------
   function escapeHtml(s) {
@@ -127,6 +133,15 @@
 
   function isMobile() {
     return window.matchMedia("(max-width: 900px)").matches;
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(String(text || ""));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // HARD safety: if modal exists, force it closed (prevents stuck overlay on reload)
@@ -313,10 +328,21 @@
       `;
     }
 
+    // Settings Store Info (includes Store ID + copy)
     if (settingsStoreInfo && cachedStore) {
+      const storeId = cachedStore.id || "";
       settingsStoreInfo.innerHTML = `
         <div><b>Store:</b> ${escapeHtml(cachedStore.name || "")}</div>
         <div><b>Currency:</b> ${escapeHtml(cachedStore.currency || "")}</div>
+
+        <div style="margin-top:10px;">
+          <div class="muted small">Store ID (send this to Orderlyy support for subscription activation)</div>
+          <div class="row" style="margin-top:6px;">
+            <input id="storeIdField" value="${escapeHtml(storeId)}" disabled />
+            <button class="btn secondary" type="button" data-copy="storeId">Copy</button>
+          </div>
+          <div id="storeIdCopyMsg" class="muted small" style="margin-top:6px;"></div>
+        </div>
       `;
     }
 
@@ -338,6 +364,7 @@
 
       if (kpiRevenue) kpiRevenue.textContent = String(a.revenue_total ?? "—");
       setDelta(kpiRevenueDelta, a.revenue_change_pct);
+
       if (kpiPending) kpiPending.textContent = String(a.pending_total ?? "—");
       setDelta(kpiPendingDelta, a.pending_change_pct);
 
@@ -472,31 +499,33 @@
   }
 
   function renderOrders() {
-    if (!ordersTbody) return;
-    ordersTbody.innerHTML = "";
+  if (!ordersTbody) return;
+  ordersTbody.innerHTML = "";
 
-    for (const o of cachedOrders) {
-      const buyer = o.buyer_username ? "@"+escapeHtml(o.buyer_username) : '<span class="muted">(unknown)</span>';
-      const delivery = o.delivery_text
-        ? `<div class="small muted" style="margin-top:6px; white-space:pre-wrap">${escapeHtml(o.delivery_text)}</div>`
-        : "";
+  for (const o of cachedOrders) {
+    const buyer = o.buyer_username
+      ? "@" + escapeHtml(o.buyer_username)
+      : '<span class="muted">(unknown)</span>';
 
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><code>${escapeHtml(o.id)}</code></td>
-        <td>${escapeHtml(o.product_name || "")}${delivery}</td>
-        <td>${buyer}</td>
-        <td>${escapeHtml(String(o.qty || ""))}</td>
-        <td><span class="badge">${escapeHtml(o.status || "")}</span></td>
-        <td>
-          <button class="btn tiny secondary" data-act="done" data-id="${escapeHtml(o.id)}">Done</button>
-          <button class="btn tiny secondary" data-act="pending" data-id="${escapeHtml(o.id)}">Pending</button>
-        </td>
-      `;
-      ordersTbody.appendChild(tr);
-    }
-  }
+    const delivery = o.delivery_text
+      ? `<div class="small muted" style="white-space:pre-wrap">${escapeHtml(o.delivery_text)}</div>`
+      : '<span class="muted">—</span>';
 
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><code>${escapeHtml(o.id)}</code></td>
+      <td>${escapeHtml(o.product_name || "")}</td>
+      <td>${buyer}</td>
+      <td>${escapeHtml(String(o.qty || ""))}</td>
+      <td><span class="badge">${escapeHtml(o.status || "")}</span></td>
+      <td>${delivery}</td>
+      <td>
+        <button class="btn tiny secondary" data-act="done" data-id="${escapeHtml(o.id)}">Done</button>
+        <button class="btn tiny secondary" data-act="pending" data-id="${escapeHtml(o.id)}">Pending</button>
+      </td>
+    `;
+    ordersTbody.appendChild(tr);
+  }}
   async function setOrderStatus(orderId, status) {
     await api(`/api/orders/${encodeURIComponent(orderId)}/status`, { method: "PUT", body: { status } });
   }
@@ -560,15 +589,12 @@
     }
   }
 
-  // IMPORTANT FIX:
-  // <img> cannot send Authorization header, so we must append token as query param.
-  // Also add cache-buster so it reloads.
+  // <img> cannot send Authorization header, so we append token as query param + cache-buster.
   function openProofModal(paymentId) {
     if (!proofModal || !proofImg) return;
 
     proofModal.hidden = false;
 
-    // clear old and force reload
     proofImg.removeAttribute("src");
     proofImg.alt = "Loading proof…";
 
@@ -635,16 +661,19 @@
             <div class="big">${active ? "✅ ACTIVE" : "🔒 INACTIVE"}</div>
           </div>
           <div>
-            <div class="muted small">Expiry</div>
+            <div class="muted small">Expires</div>
             <div class="big">${escapeHtml(exp)}</div>
           </div>
         </div>
+
         <div class="muted small" style="margin-top:10px;">
-          Need activation? Contact support: <a href="${escapeHtml(supLink)}" target="_blank" rel="noreferrer">@${escapeHtml(supUser)}</a>
+          For subscription activation/renewal, send your <b>Store ID</b> to support:
+          <a href="${escapeHtml(supLink)}" target="_blank" rel="noreferrer">@${escapeHtml(supUser)}</a>
         </div>
       `;
     }
 
+    // bank form prefill
     if (bankForm) {
       const bank = bankForm.querySelector('input[name="bank_name"]');
       const acct = bankForm.querySelector('input[name="account_number"]');
@@ -686,17 +715,16 @@
     if (!copyMsg) return;
 
     const token = getToken();
-    if (!token) { copyMsg.textContent = "No token."; return; }
+    if (!token) {
+      copyMsg.textContent = "No token.";
+      return;
+    }
 
     const base = location.origin + location.pathname;
     const link = `${base}?token=${encodeURIComponent(token)}`;
 
-    try {
-      await navigator.clipboard.writeText(link);
-      copyMsg.textContent = "Copied ✅";
-    } catch {
-      copyMsg.textContent = "Copy failed. (Browser blocked clipboard)";
-    }
+    const ok = await copyText(link);
+    copyMsg.textContent = ok ? "Copied ✅" : "Copy failed. (Browser blocked clipboard)";
   }
 
   // ---------------- Core loading ----------------
@@ -719,11 +747,14 @@
 
   // ---------------- Wiring ----------------
   function wireEvents() {
+    // Hamburger
     if (hamburger) hamburger.addEventListener("click", openSidebar);
     if (backdrop) backdrop.addEventListener("click", closeSidebar);
 
+    // Nav
     navBtns.forEach((btn) => btn.addEventListener("click", () => setActivePage(btn.dataset.page)));
 
+    // Login
     if (loginBtn) {
       loginBtn.addEventListener("click", async () => {
         const t = tokenInput ? tokenInput.value.trim() : "";
@@ -738,6 +769,7 @@
       });
     }
 
+    // Logout
     if (logoutBtn) {
       logoutBtn.addEventListener("click", () => {
         clearToken();
@@ -745,10 +777,13 @@
       });
     }
 
+    // Overview period
     if (periodSelect) periodSelect.addEventListener("change", () => loadAnalytics().catch(() => {}));
 
+    // Products refresh
     if (refreshProductsBtn) refreshProductsBtn.addEventListener("click", () => loadProducts().catch((e) => alert(e.message)));
 
+    // Products actions
     if (productsTbody) {
       productsTbody.addEventListener("click", async (ev) => {
         const btn = ev.target.closest("button");
@@ -774,6 +809,7 @@
       });
     }
 
+    // Product form submit
     if (productForm) {
       productForm.addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -786,6 +822,7 @@
       });
     }
 
+    // Product form clear
     if (clearProductFormBtn && productForm) {
       clearProductFormBtn.addEventListener("click", () => {
         productForm.reset();
@@ -795,12 +832,15 @@
       });
     }
 
+    // Orders refresh
     if (refreshOrdersBtn) refreshOrdersBtn.addEventListener("click", () => loadOrders().catch((e) => alert(e.message)));
 
+    // Orders actions
     if (ordersTbody) {
       ordersTbody.addEventListener("click", async (ev) => {
         const btn = ev.target.closest("button");
         if (!btn) return;
+
         const act = btn.getAttribute("data-act");
         const id = btn.getAttribute("data-id");
         if (!act || !id) return;
@@ -816,19 +856,25 @@
       });
     }
 
+    // Payments refresh + filter
     if (refreshPaymentsBtn) refreshPaymentsBtn.addEventListener("click", () => loadPayments().catch((e) => showPaymentsMsg(e)));
     if (paymentStatusFilter) paymentStatusFilter.addEventListener("change", () => loadPayments().catch((e) => showPaymentsMsg(e)));
 
+    // Payments actions
     if (paymentsTbody) {
       paymentsTbody.addEventListener("click", async (ev) => {
         const btn = ev.target.closest("button");
         if (!btn) return;
+
         const act = btn.getAttribute("data-act");
         const id = btn.getAttribute("data-id");
         if (!act || !id) return;
 
         try {
-          if (act === "proof") { openProofModal(id); return; }
+          if (act === "proof") {
+            openProofModal(id);
+            return;
+          }
           if (act === "approve") {
             if (!confirm("Approve this payment?")) return;
             await approvePayment(id);
@@ -849,7 +895,7 @@
       });
     }
 
-    // Modal close
+    // Proof modal close
     if (proofClose) proofClose.addEventListener("click", closeProofModal);
     if (proofModal) {
       proofModal.addEventListener("click", (e) => {
@@ -857,7 +903,7 @@
       });
     }
 
-    // Settings
+    // Settings: bank save
     if (bankForm) {
       bankForm.addEventListener("submit", (ev) => {
         ev.preventDefault();
@@ -866,13 +912,32 @@
         });
       });
     }
+
+    // Settings: bank clear
     if (bankClear && bankForm) {
       bankClear.addEventListener("click", () => {
         bankForm.reset();
         if (bankMsg) bankMsg.textContent = "";
       });
     }
+
+    // Settings: copy dashboard link
     if (copyDashLink) copyDashLink.addEventListener("click", () => copyDashboardLink());
+
+    // Settings: copy Store ID (delegation inside settingsStoreInfo)
+    if (settingsStoreInfo) {
+      settingsStoreInfo.addEventListener("click", async (ev) => {
+        const btn = ev.target.closest("button");
+        if (!btn) return;
+        const kind = btn.getAttribute("data-copy");
+        if (kind !== "storeId") return;
+
+        const storeId = cachedStore?.id || "";
+        const ok = await copyText(storeId);
+        const msgEl = $("storeIdCopyMsg");
+        if (msgEl) msgEl.textContent = ok ? "Copied ✅" : "Copy failed.";
+      });
+    }
   }
 
   // ---------------- Boot ----------------
@@ -909,3 +974,4 @@
     });
   });
 })();
+```0
